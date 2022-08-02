@@ -1,47 +1,231 @@
-#include-once
-#include "html.au3"
 
-$tagParser = _
-    "uint pos;"& _ ; pos: usize, // "usize" is an unsigned integer, similar to "size_t" in C
-    "ptr input;"   ; input: String,
+#include "dom.au3"
+#include "../au3pm/AutoItObject_Internal.au3"
+#include "vector.au3"
 
-; Read the current character without consuming it.
-Func Parser_next_char($parser)
-    Return DllStructGetData(DllStructCreate("WCHAR", $parser.input + $parser.pos * 2), 1)
+#namespace \Parser
+
+Global Enum $PARSER_POS, $PARSER_LENGTH, $PARSER_INPUT, $PARSER__END
+
+Func parser($sInput)
+    Local $aParser[$PARSER__END]
+    $aParser[$PARSER_POS] = 0
+    $aParser[$PARSER_INPUT] = StringToASCIIArray($sInput)
+    $aParser[$PARSER_LENGTH] = StringLen($sInput)-1
+    return $aParser
 EndFunc
 
-; Do the next characters start with the given string?
-Func Parser_starts_with($parser, $s)
-    Return DllStructGetData(DllStructCreate(StringFormat("WCHAR[%s]", StringLen($s)), $parser.input + $parser.pos * 2), 1) == $s
+#cs
+# Read the current character without consuming it.
+# @return char
+#ce
+Func parser_next_char(ByRef $aParser)
+    Return ChrW(($aParser[$PARSER_INPUT])[$aParser[$PARSER_POS]])
 EndFunc
 
-; Return true if all input is consumed.
-Func Parser_eof($parser)
-    Return $parser.pos >= _WinAPI_StrLen($parser.input)
+#cs
+# Do the next characters start with the given string?
+# @param string $s
+# @return bool
+#ce
+Func parser_starts_with(ByRef $aParser, $s)
+    Local $aS = StringToASCIIArray($s)
+    Local $iS = StringLen($s) - 1
+    For $i = 0 To $iS
+        If ($aParser[$PARSER_INPUT])[$aParser[$PARSER_POS] + $i] <> $aS[$i] Then Return False
+    Next
+    Return True
 EndFunc
 
-; Return the current character, and advance self.pos to the next character.
-Func Parser_consume_char($parser)
-    Local $char = Parser_next_char($parser)
-    $parser.pos += 1
+#cs
+# Return true if all input is consumed.
+# @return bool
+#ce
+Func parser_eof(ByRef $aParser)
+    Return $aParser[$PARSER_POS] > $aParser[$PARSER_LENGTH]
+EndFunc
+
+#cs
+# Return the current character, and advance self.pos to the next character.
+# @return char
+#ce
+Func parser_consume_char(ByRef $aParser)
+    ;If parser_eof($aParser) Then return ChrW(0)
+    Local $char = parser_next_char($aParser)
+    $aParser[$PARSER_POS]+=1
+    ;consolewrite($char)
     Return $char
 EndFunc
 
-; Consume characters until `test` returns false.
-Func Parser_consume_while($parser, $test)
+#cs
+# Consume characters until `test` returns false.
+# @param callable($char):bool $test
+# @return string
+#ce
+Func parser_consume_while(ByRef $aParser, $test)
     Local $result = ""
-    While (Not Parser_eof($parser)) And Call($test, Parser_next_char($parser))
-        $result &= Parser_consume_char($parser)
+    While Not parser_eof($aParser) And $test(parser_next_char($aParser))
+        $result &= parser_consume_char($aParser)
     WEnd
     Return $result
 EndFunc
 
-; Consume and discard zero or more whitespace characters.
-Func Parser_consume_whitespace($parser)
-    Parser_consume_while($parser, StringIsSpace)
+#cs
+# Consume and discard zero or more whitespace characters.
+#ce
+Func parser_consume_whitespace(ByRef $aParser)
+    Return parser_consume_while($aParser, StringIsSpace)
 EndFunc
 
-; Parse a tag or attribute name.
-Func Parser_parse_tag_name($parser)
-    ;
+#cs
+# Parse a tag or attribute name.
+# @return string
+#ce
+Func parser_parse_tag_name(ByRef $aParser)
+    Return parser_consume_while($aParser, StringIsAlNum)
+EndFunc
+
+#cs
+# Parse a single node.
+# @return \Dom\Node
+#ce
+Func parser_parse_node(ByRef $aParser)
+    Switch parser_next_char($aParser)
+        Case '<'
+            Return parser_parse_element($aParser)
+        Case Else
+            Return parser_parse_text($aParser)
+    EndSwitch
+EndFunc
+
+#cs
+# Parse a text node.
+# @return \Dom\Node
+#ce
+Func parser_parse_text(ByRef $aParser)
+    Return text(parser_consume_while($aParser, anonymous1658152124))
+EndFunc
+
+#cs
+# @internal
+#ce
+Func anonymous1658152124($char)
+    Return Not ($char = '<')
+EndFunc
+
+#cs
+# Parse a single element, including its open tag, contents, and closing tag.
+# @return \Dom\Node
+#ce
+Func parser_parse_element(ByRef $aParser)
+    ; Opening tag.
+    assert(parser_consume_char($aParser) = '<')
+    Local $tag_name = parser_parse_tag_name($aParser)
+    Local $attrs = parser_parse_attributes($aParser)
+    assert(parser_consume_char($aParser) = '>')
+
+    ; Contents.
+    Local $children = parser_parse_nodes($aParser)
+
+    ; Closing tag.
+    assert(parser_consume_char($aParser) = '<')
+    assert(parser_consume_char($aParser) = '/')
+    assert(parser_parse_tag_name($aParser) = $tag_name)
+    assert(parser_consume_char($aParser) = '>')
+
+    Return elem($tag_name, $attrs, $children)
+EndFunc
+
+#cs
+# Parse a single name="value" pair.
+# @return [string, string]
+#ce
+Func parser_parse_attr(Byref $aParser)
+    Local $name = parser_parse_tag_name($aParser)
+    assert(parser_consume_char($aParser) = '=')
+    Local $value = parser_parse_attr_value($aParser)
+    Local $return = [$name, $value]
+    return $return
+EndFunc
+
+#cs
+# Parse a quoted value.
+# @returns string
+#ce
+Func parser_parse_attr_value(Byref $aParser)
+    Local $open_quote = parser_consume_char($aParser)
+    assert($open_quote = '"' Or $open_quote = "'")
+    anonymous1658211806(Null, $open_quote); Setup fake lambda expression scope
+    Local $value = parser_consume_while($aParser, anonymous1658211806)
+    assert(parser_consume_char($aParser) = $open_quote)
+    Return $value
+EndFunc
+
+Func anonymous1658211806($c, $x = Null)
+    Local Static $open_quote = Null
+    If @NumParams = 2 then $open_quote = $x
+    Return Not ($c = $open_quote)
+EndFunc
+
+#cs
+# Parse a list of name="value" pairs, separated by whitespace.
+# @return \Dom\AttrMap
+#ce
+Func parser_parse_attributes(Byref $aParser)
+    Local $attributes = IDispatch()
+    While 1
+        parser_consume_whitespace($aParser)
+        If parser_next_char($aParser) = '>' Then ExitLoop
+        Local $result = parser_parse_attr($aParser)
+        Local $name = $result[0]
+        Local $value = $result[1]
+        $attributes.__set($name, $value)
+    WEnd
+    Return $attributes
+EndFunc
+
+#cs
+# Parse a sequence of sibling nodes.
+# @return Vec<\Dom\Node>
+#ce
+Func parser_parse_nodes(Byref $aParser)
+    $nodes = vector(4)
+    While 1
+        parser_consume_whitespace($aParser)
+        If parser_eof($aParser) Or parser_starts_with($aParser, '</') Then ExitLoop
+        parser_vector_push($nodes, parser_parse_node($aParser))
+    WEnd
+    Return $nodes
+EndFunc
+
+#cs
+# Parse an HTML document and return the root element.
+# @param string $source
+# @return \Dom\Node
+#ce
+Func parser_parse($source)
+    Local $nodes = parser_parse_nodes(parser($source))
+
+    ; If the document contains a root element, just return it. Otherwise, create one.
+    If vector_len($nodes) = 1 then
+        Return DllStructGetData(DllStructCreate("PTR", vector_remove($nodes, 0)), 1)
+        ;return vector_remove($nodes, 0)
+    endif
+    Return elem("html", IDispatch(), $nodes)
+EndFunc
+
+Func parser_vector_push($vector, $value)
+    ;consolewrite(DllStructGetPtr(DllStructExGetStruct($value))&@crlf)
+    assert($value <> 0)
+    if $value <> 0 then __DllStructEx_AddRef(Ptr($value))
+    $t = DllStructCreate("PTR")
+    DllStructSetData($t, 1, DllStructGetPtr(DllStructExGetStruct($value)))
+    vector_push($vector, DllStructGetPtr($t))
+    Return SetError(@error, @extended, Null)
+EndFunc
+
+Func assert($condition, $line = @ScriptLineNumber)
+    If $condition Then Return
+    ConsoleWrite("Assertion failed on line "&$line&@CRLF)
+    Exit
 EndFunc
