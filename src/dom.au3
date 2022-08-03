@@ -1,5 +1,6 @@
 ##NoTrayIcon
 #include "../au3pm/DllStructEx.au3"
+#include "../au3pm/Vector.au3"
 #include <Array.au3>
 
 #namespace \Dom
@@ -7,8 +8,7 @@
 ;$tagNode = "Vector *children;NodeType node_type;"
 ;$tagNodeType = "BYTE num;"
 ;$tagNode = "Vector *children;NodeType node_type;"
-$tagNode = "PTR children;NodeType node_type;"
-$itagNode = DllStructGetSize(DllStructCreate($tagNode))
+$tagNode = "IDispatch *children;NodeType node_type;"
 ;$tagNodeType = "BYTE type;union{PTR text;IDispatch *element;} data;"
 $tagNodeType = "BYTE type;union{PTR text;PTR element;} data;"
 
@@ -42,7 +42,7 @@ EndFunc
 Func text($data)
     $oNode = Node()
     If @error <> 0 then Return SetError(1, 0, 0)
-    $oNode.children = vector($itagNode)
+    $oNode.children = Vector()
     $oNode.node_type.type = $NodeType_TEXT
     $oNode.node_type.data.text = _WinAPI_CreateString($data)
     Return $oNode
@@ -104,9 +104,9 @@ Func Node_toString($node)
             $sHTML &= '>'
             Local $children = $node.children
             ;consolewrite("vector_len: "&vector_len($children)&@crlf)
-            For $i = 0 To vector_len($children)
+            For $i = 0 To $children.Size - 1
                 ;$sHTML &= Node_toString(vector_get($children, $i))
-                $sHTML &= Node_toString(DllStructGetData(DllStructCreate("PTR", vector_remove($children, $i)), 1))
+                $sHTML &= Node_toString($children.at($i))
             Next
             $sHTML &= '</' & $tag_name & '>'
         Case Else
