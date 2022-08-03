@@ -1,7 +1,7 @@
 
 #include "dom.au3"
 #include "../au3pm/AutoItObject_Internal.au3"
-#include "vector.au3"
+#include "../au3pm/Vector.au3"
 
 #namespace \Parser
 
@@ -189,11 +189,11 @@ EndFunc
 # @return Vec<\Dom\Node>
 #ce
 Func parser_parse_nodes(Byref $aParser)
-    $nodes = vector(4)
+    $nodes = Vector()
     While 1
         parser_consume_whitespace($aParser)
         If parser_eof($aParser) Or parser_starts_with($aParser, '</') Then ExitLoop
-        parser_vector_push($nodes, parser_parse_node($aParser))
+        $nodes.push_back(parser_parse_node($aParser))
     WEnd
     Return $nodes
 EndFunc
@@ -207,21 +207,10 @@ Func parser_parse($source)
     Local $nodes = parser_parse_nodes(parser($source))
 
     ; If the document contains a root element, just return it. Otherwise, create one.
-    If vector_len($nodes) = 1 then
-        Return DllStructGetData(DllStructCreate("PTR", vector_remove($nodes, 0)), 1)
-        ;return vector_remove($nodes, 0)
+    If $nodes.Size = 1 then
+        Return $nodes.at(0)
     endif
     Return elem("html", IDispatch(), $nodes)
-EndFunc
-
-Func parser_vector_push($vector, $value)
-    ;consolewrite(DllStructGetPtr(DllStructExGetStruct($value))&@crlf)
-    assert($value <> 0)
-    if $value <> 0 then __DllStructEx_AddRef(Ptr($value))
-    $t = DllStructCreate("PTR")
-    DllStructSetData($t, 1, DllStructGetPtr(DllStructExGetStruct($value)))
-    vector_push($vector, DllStructGetPtr($t))
-    Return SetError(@error, @extended, Null)
 EndFunc
 
 Func assert($condition, $line = @ScriptLineNumber)
