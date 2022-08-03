@@ -1,4 +1,4 @@
-##NoTrayIcon
+#include-once
 #include "../au3pm/DllStructEx.au3"
 #include "../au3pm/Vector.au3"
 #include <Array.au3>

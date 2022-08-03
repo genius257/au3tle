@@ -1,4 +1,4 @@
-
+#include-once
 #include "dom.au3"
 #include "../au3pm/AutoItObject_Internal.au3"
 #include "../au3pm/Vector.au3"
