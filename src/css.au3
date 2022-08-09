@@ -23,30 +23,6 @@ Global Const $tagColor = _
     "BYTE b;"& _
     "BYTE a;"
 
-#cs
-# Parse one simple selector, e.g.: `type#id.class1.class2.class3`
-# @return SimpleSelector
-#ce
-Func parse_simple_selector(ByRef $aCss)
-    Local $selector = DllStructExCreate($tagSimpleSelector)
-    $selector.class = Vector()
-    While Not eof($aCss)
-        Local $c = next_char($aCss)
-        Switch $c
-            Case '#'
-            Case '.'
-            Case '*'
-            Case Else
-                If valid_identifier_char($c) Then
-                    $selector.tag_name = _WinAPI_CreateString(parse_identifier($aCss))
-                Else
-                    ExitLoop
-                EndIf
-        EndSwitch
-    WEnd
-    Return $selector
-EndFunc
-
 #Region Selector
     #cs
     # @typedef [Number, Number, Number] Specificity
@@ -90,12 +66,13 @@ EndFunc
 Func parse($source)
     Local $parser = DllStructExCreate($tagParser)
     $parser.input = _WinAPI_CreateString($source)
+    $parser.length = StringLen($source)
     Local $stylesheet = DllStructExCreate($tagStylesheet)
     $stylesheet.rules = parse_rules($parser)
     Return $stylesheet
 EndFunc
 
-Global Const $tagParser = "PTR pos;PTR input;"
+Global Const $tagParser = "PTR pos;PTR input;PTR length;"
 
 #Region Parser
     #cs
@@ -140,8 +117,8 @@ Global Const $tagParser = "PTR pos;PTR input;"
                 Case '{'
                     ExitLoop
                 Case Else
-                    ConsoleWriteError(StringFormat("Unexpected character %s in selector list\n", $c))
-                    Exit
+                    ConsoleWriteError(StringFormat("Unexpected character %s in selector list\n", AscW($c)))
+                    Exit 1
             EndSwitch
         WEnd
         ; Return selectors with highest specificity first, for use in matching.
@@ -161,7 +138,7 @@ Global Const $tagParser = "PTR pos;PTR input;"
             Switch $c
                 Case '#'
                     consume_char($self)
-                    $selector.id = parse_identifier($self)
+                    $selector.id = _WinAPI_CreateString(parse_identifier($self))
                 Case '.'
                     consume_char($self)
                     $selector.class.push_back(parse_identifier($self))
@@ -184,7 +161,7 @@ Global Const $tagParser = "PTR pos;PTR input;"
     # @return Vector<Declaration>
     #ce
     Func parse_declarations($self)
-        assert_eq(consume_char($slef), '{')
+        assert_eq(consume_char($self), '{')
         Local $declarations = Vector()
         While 1
             consume_whitespace($self)
@@ -243,8 +220,8 @@ Global Const $tagParser = "PTR pos;PTR input;"
     Func parse_length($self)
         Local $value = DllStructExCreate($tagValue)
         $value.type = $VALUE_LENGTH
-        $value.data.length.unit = parse_unit($self)
         $value.data.length.val = parse_float($self)
+        $value.data.length.unit = parse_unit($self)
         Return $value
     EndFunc
 
@@ -268,7 +245,8 @@ Global Const $tagParser = "PTR pos;PTR input;"
             Case 'px'
                 Return $UNIT_PX
             Case Else
-                panic('unrecognized unit')
+                ConsoleWriteError('unrecognized unit')
+                Exit 1
         EndSwitch
     EndFunc
 
@@ -279,7 +257,7 @@ Global Const $tagParser = "PTR pos;PTR input;"
         assert_eq(consume_char($self), '#')
         Local $value = DllStructExCreate($tagValue)
         $value.type = $VALUE_COLORVALUE
-        Local $color = $value.data.color
+        Local $color = $value.data.colorValue
         $color.r = parse_hex_pair($self)
         $color.g = parse_hex_pair($self)
         $color.b = parse_hex_pair($self)
@@ -292,8 +270,82 @@ Global Const $tagParser = "PTR pos;PTR input;"
     # @return BYTE u8
     #ce
     Func parse_hex_pair($self)
-        $s = DllStructGetData(DllStructCreate("WCHAR[2]", $self.input + $self.pos), 1)
+        Local $s = DllStructGetData(DllStructCreate("WCHAR[2]", $self.input + $self.pos*2), 1)
         $self.pos += 2
         Return Dec($s)
     EndFunc
+
+    #cs
+    # Parse a property name or keyword.
+    # @return String
+    #ce
+    Func parse_identifier($self)
+        return consume_while($self, valid_identifier_char)
+    EndFunc
+
+    #cs
+    # Consume and discard zero or more whitespace characters.
+    #ce
+    Func consume_whitespace($self)
+        consume_while($self, StringIsSpace)
+    EndFunc
+
+    #cs
+    # Consume characters until `test` returns false.
+    # @param Func(char) -> boolean  $test
+    # @return String
+    #ce
+    Func consume_while($self, $test)
+        Local $result = ""
+        While (Not eof($self)) And $test(next_char($self))
+            $result &= consume_char($self)
+        WEnd
+        Return $result
+    EndFunc
+
+    #cs
+    # Return the current character, and advance self.pos to the next character.
+    # @return char
+    #ce
+    Func consume_char($self)
+        If $self.length = $self.pos Then Return Null
+        Local $cur_char = DllStructGetData(DllStructCreate('WCHAR', $self.input + $self.pos*2), 1)
+        ConsoleWrite($cur_char&@CRLF)
+        $self.pos += 1
+        Return $cur_char
+    EndFunc
+
+    #cs
+    # Read the current character without consuming it.
+    # @return char
+    #ce
+    Func next_char($self)
+        If $self.length = $self.pos Then Return Null
+        Return DllStructGetData(DllStructCreate('WCHAR', $self.input + $self.pos*2), 1)
+    EndFunc
+
+    #cs
+    # Return true if all input is consumed.
+    # @return boolean
+    #ce
+    Func eof($self)
+        ;ConsoleWrite(StringFormat('%s >= %s        = %s\n', $self.pos, $self.length, $self.pos >= $self.length))
+        ;Return $self.pos = 45
+        Return $self.pos >= $self.length
+    EndFunc
 #EndRegion Parser
+
+#cs
+# @param char $c
+# @return boolean
+#ce
+Func valid_identifier_char($c)
+    ConsoleWrite($c&@CRLF)
+    Return StringIsAlNum($c) Or $c = '-' Or $c = '_'
+EndFunc
+
+Func assert_eq($expected, $actual)
+    If $expected = $actual Then Return
+    ConsoleWriteError(StringFormat('Failed asserting that %s equals %s\n', $expected, $actual))
+    Exit 1
+EndFunc
