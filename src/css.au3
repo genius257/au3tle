@@ -310,7 +310,6 @@ Global Const $tagParser = "PTR pos;PTR input;PTR length;"
     Func consume_char($self)
         If $self.length = $self.pos Then Return Null
         Local $cur_char = DllStructGetData(DllStructCreate('WCHAR', $self.input + $self.pos*2), 1)
-        ConsoleWrite($cur_char&@CRLF)
         $self.pos += 1
         Return $cur_char
     EndFunc
@@ -329,8 +328,6 @@ Global Const $tagParser = "PTR pos;PTR input;PTR length;"
     # @return boolean
     #ce
     Func eof($self)
-        ;ConsoleWrite(StringFormat('%s >= %s        = %s\n', $self.pos, $self.length, $self.pos >= $self.length))
-        ;Return $self.pos = 45
         Return $self.pos >= $self.length
     EndFunc
 #EndRegion Parser
@@ -340,7 +337,6 @@ Global Const $tagParser = "PTR pos;PTR input;PTR length;"
 # @return boolean
 #ce
 Func valid_identifier_char($c)
-    ConsoleWrite($c&@CRLF)
     Return StringIsAlNum($c) Or $c = '-' Or $c = '_'
 EndFunc
 
