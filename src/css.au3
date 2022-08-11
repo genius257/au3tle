@@ -270,7 +270,7 @@ Global Const $tagParser = "PTR pos;PTR input;PTR length;"
     # @return BYTE u8
     #ce
     Func parse_hex_pair($self)
-        Local $s = DllStructGetData(DllStructCreate("WCHAR[2]", $self.input + $self.pos*2), 1)
+        Local $s = DllStructGetData(DllStructCreate("WCHAR[2]", $self.input + Number($self.pos, 2)*2), 1)
         $self.pos += 2
         Return Dec($s)
     EndFunc
@@ -309,7 +309,7 @@ Global Const $tagParser = "PTR pos;PTR input;PTR length;"
     #ce
     Func consume_char($self)
         If $self.length = $self.pos Then Return Null
-        Local $cur_char = DllStructGetData(DllStructCreate('WCHAR', $self.input + $self.pos*2), 1)
+        Local $cur_char = DllStructGetData(DllStructCreate('WCHAR', $self.input + Number($self.pos, 2)*2), 1)
         $self.pos += 1
         Return $cur_char
     EndFunc
@@ -320,7 +320,7 @@ Global Const $tagParser = "PTR pos;PTR input;PTR length;"
     #ce
     Func next_char($self)
         If $self.length = $self.pos Then Return Null
-        Return DllStructGetData(DllStructCreate('WCHAR', $self.input + $self.pos*2), 1)
+        Return DllStructGetData(DllStructCreate('WCHAR', $self.input + Number($self.pos, 2)*2), 1)
     EndFunc
 
     #cs
