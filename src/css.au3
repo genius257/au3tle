@@ -11,7 +11,7 @@ $tagRule = "IDispatch *selectors;IDispatch *declarations;"
 Global Enum $SELECTOR_SIMPLE
 
 $tagSimpleSelector = "PTR tag_name;PTR id;IDispatch *class;"
-$tagDeclaration = "PTR name;Value value;"
+$tagDeclaration = "PTR name;IDispatch *value;"
 Global Const $tagValue = "BYTE type;union{PTR keyword;union{FLOAT val;BYTE unit;} length;Color colorValue;} data;"
 
 Global $VALUE_KEYWORD, $VALUE_LENGTH, $VALUE_COLORVALUE ; insert more values here
