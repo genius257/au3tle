@@ -109,7 +109,7 @@ Global Const $tagParser = "PTR pos;PTR input;PTR length;"
         While 1
             $selectors.push_back(parse_simple_selector($self))
             consume_whitespace($self)
-            $c = next_char($self)
+            Local $c = next_char($self)
             Switch $c
                 Case ','
                     consume_char($self)
