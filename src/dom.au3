@@ -114,3 +114,23 @@ Func Node_toString($node)
     EndSwitch
     Return $sHTML
 EndFunc
+
+; Element methods
+#Region ElementData
+    #cs
+    # @return string?
+    #ce
+    Func id($self)
+        Return $self.attributes.__get("id")
+    EndFunc
+
+    #cs
+    # @return Array<string>
+    #ce
+    Func classes($self)
+        Local $classlist = $self.attributes.__get("class")
+        If IsString($classlist) Then Return StringSplit($classlist, " ")
+        Local $emptyArray[0]
+        Return $emptyArray
+    EndFunc
+#EndRegion ElementData
