@@ -141,14 +141,70 @@ Func matching_rules($elem, $stylesheet)
     Return $result
 EndFunc
 
+#cs
+# If `rule` matches `elem`, return a `MatchedRule`. Otherwise return `None`.
+# @param ElementData $elem
+# @param Rule
+# @return MatchedRule?
+#ce
 Func match_rule($elem, $rule)
     ; Find the first (most specific) matching selector.
     #cs
     rule.selectors.iter().find(|selector| matches(elem, *selector))
         .map(|selector| (selector.specificity(), rule))
     #ce
-    For $i = 0 To 10
+    Local $selectors = $rule.selectors;
+    Local $keys = $selectors.__keys()
+    For $i = 0 To UBound($keys, 1) - 1
 
+        Local $selector = $selectors.at($keys[$i])
+        If matches($elem, $selector) Then
+            Local $aReturn = [specificity($selector), $rule]
+            Return $aReturn
+        EndIf
     Next
-    matches()
+    Return Null
+EndFunc
+
+#cs
+# Selector matching:
+# @param ElementData $elem
+# @param Selector $selector
+# @return boolean
+#ce
+Func matches($elem, $selector)
+    #cs
+    ; TODO: Currently only selector type available is simple. and no way of checking. Until changed this code is commented.
+    Switch $selector.type
+        Case "Simple"
+            matches_simple_selector($elem, $selector)
+    EndSwitch
+    #ce
+    Return matches_simple_selector($elem, $selector)
+EndFunc
+
+#cs
+# @param ElementData $elem
+# @param SimpleSelector $selector
+# @return boolean
+#ce
+Func matches_simple_selector($elem, $selector)
+    ; Check type selector
+    If Not ($elem.tag_name == _WinAPI_GetString($selector.tag_name)) Then Return False
+
+    ; Check ID selector
+    If Not ($elem.id == _WinAPI_CreateString($selector.id)) Then Return False
+
+    ; Check class selectors
+    Local $elem_classes = classes($elem)
+    Local $selector_class = $selector.class
+    For $i = 0 To $selector_class.size - 1
+        For $j = 0 To UBound($elem_classes)
+            If $selector.at($i) = $elem_classes[$j] Then ContinueLoop;TODO: verify if case sensitive matching is required.
+            Return False
+        Next
+    Next
+
+    ; We didn't find any non-matching selector components.
+    Return True
 EndFunc
