@@ -55,3 +55,20 @@ Global Const $tagBoxType = _
         EndSwitch
     EndFunc
 #EndRegion LayoutBox
+
+#cs
+# Transform a style tree into a layout tree.
+# @param StyledNode $node
+# @param Dimensions $containing_block
+# @return LayoutBox
+#ce
+Func layout_tree($node, $containing_block)
+    ; The layout algorithm expects the container height to start at 0.
+    ; TODO: Save the initial containing block height, for calculating percent heights.
+    $containing_block.content.height = 0.0
+
+    Local $root_box = build_layout_tree($node)
+    $root_box.layout($containing_block)
+
+    Return $root_box
+EndFunc
